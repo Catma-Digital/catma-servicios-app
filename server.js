@@ -18,7 +18,6 @@ app.get('/', (req, res) => {
 });
 
 // Conexión dinámica optimizada para Hostinger y desarrollo local
-// Conexión dinámica optimizada para Hostinger y desarrollo local
 const db = mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'u742254071_catma_db_user',
@@ -122,8 +121,16 @@ db.query(`
 
 app.post('/login', (req, res) => {
     const { nombre_usuario, password } = req.body;
+    console.log(`[LOGIN] Intentando acceder con el usuario: "${nombre_usuario}"`);
+
     db.query('SELECT * FROM usuarios WHERE nombre_usuario = ?', [nombre_usuario], async (err, results) => {
-        if (err || results.length === 0) return res.status(401).send('Usuario no encontrado.');
+        if (err) {
+            console.error('[LOGIN ERROR] Error en la consulta:', err);
+            return res.status(500).send('Error de base de datos.');
+        }
+        console.log('[LOGIN DB] Resultados obtenidos:', results);
+
+        if (results.length === 0) return res.status(401).send('Usuario no encontrado.');
         const usuario = results[0];
         const match = await bcrypt.compare(password, usuario.password_hash);
         if (!match) return res.status(401).send('Contraseña incorrecta.');
