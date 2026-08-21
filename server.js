@@ -18,11 +18,13 @@ app.get('/', (req, res) => {
 });
 
 // Conexión dinámica optimizada para Hostinger y desarrollo local
+// Conexión dinámica optimizada para Hostinger y desarrollo local
 const db = mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'u742254071_catma_db_user',
     password: process.env.DB_PASSWORD || 'Catma:2026.',
-    database: process.env.DB_NAME || 'u742254071_servicios_db'
+    database: process.env.DB_NAME || 'u742254071_servicios_db',
+    port: process.env.DB_PORT || 3306
 });
 
 db.connect((err) => {
