@@ -17,12 +17,12 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Conexión directa a la base de datos de Hostinger
+// Conexión dinámica optimizada para Hostinger y desarrollo local
 const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'u742254071_catma_db_user',
-    password: 'Catma:2026.,', // Reemplaza esto con tu contraseña exacta de Hostinger
-    database: 'u742254071_servicios_db'
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'u742254071_catma_db_user',
+    password: process.env.DB_PASSWORD || 'Catma:2026.',
+    database: process.env.DB_NAME || 'u742254071_servicios_db'
 });
 
 db.connect((err) => {
