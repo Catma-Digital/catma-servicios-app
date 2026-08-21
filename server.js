@@ -17,13 +17,13 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Conexión a la base de datos
+// Conexión a la base de datos (dinámica para producción en Hostinger y desarrollo local)
 const db = mysql.createConnection({
-    host: '127.0.0.1',
-    port: 3307,
-    user: 'root',
-    password: '123456',
-    database: 'catma_servicios_db'
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: process.env.DB_PORT || 3307,
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '123456',
+    database: process.env.DB_NAME || 'catma_servicios_db'
 });
 
 db.connect((err) => {
@@ -77,7 +77,7 @@ db.query(`
             if (results.length === 0) {
                 const hash = await bcrypt.hash('123456', 10);
                 db.query('INSERT INTO usuarios (nombre_usuario, password_hash, rol) VALUES (?, ?, ?)',
-                    ['admin', hash, 'admin'], () => {
+                    ['admin', hash, 'administrador'], () => {
                         console.log('¡Usuario administrador inicializado: admin / 123456!');
                     });
             }
@@ -89,8 +89,7 @@ db.query(`
 db.query(`
     SELECT COLUMN_NAME 
     FROM INFORMATION_SCHEMA.COLUMNS 
-    WHERE TABLE_SCHEMA = 'catma_servicios_db' 
-      AND TABLE_NAME = 'servicios_mantenimiento_completo' 
+    WHERE TABLE_NAME = 'servicios_mantenimiento_completo' 
       AND COLUMN_NAME = 'fecha_registro'
 `, (err, results) => {
     if (!err && results.length === 0) {
@@ -106,8 +105,7 @@ db.query(`
 db.query(`
     SELECT COLUMN_NAME, DATA_TYPE 
     FROM INFORMATION_SCHEMA.COLUMNS 
-    WHERE TABLE_SCHEMA = 'catma_servicios_db' 
-      AND TABLE_NAME = 'servicios_mantenimiento_completo' 
+    WHERE TABLE_NAME = 'servicios_mantenimiento_completo' 
       AND COLUMN_NAME = 'evidencia'
 `, (err, results) => {
     if (!err && results.length === 0) {
@@ -196,7 +194,6 @@ app.post('/guardar-servicio-completo', upload.array('evidencias', 10), (req, res
         fecha_confirmada, tecnico_asignado, estatus, fecha_realizado, observaciones
     } = req.body;
 
-    // Procesar múltiples archivos subidos
     let nombresArchivos = null;
     if (req.files && req.files.length > 0) {
         nombresArchivos = req.files.map(file => file.filename).join(',');
@@ -232,7 +229,6 @@ app.put('/actualizar-servicio/:id', upload.array('evidencias', 10), (req, res) =
         fecha_confirmada, tecnico_asignado, estatus, fecha_realizado, observaciones
     } = req.body;
 
-    // Consultar primero las evidencias anteriores para no perderlas
     db.query('SELECT evidencia FROM servicios_mantenimiento_completo WHERE id = ?', [servicioId], (err, rows) => {
         if (err) {
             console.error('Error al consultar servicio:', err);
@@ -241,7 +237,6 @@ app.put('/actualizar-servicio/:id', upload.array('evidencias', 10), (req, res) =
 
         let evidenciasFinales = rows[0]?.evidencia || '';
 
-        // Si el usuario subió nuevos archivos, los agregamos a los existentes
         if (req.files && req.files.length > 0) {
             const nuevosArchivos = req.files.map(file => file.filename).join(',');
             evidenciasFinales = evidenciasFinales ? `${evidenciasFinales},${nuevosArchivos}` : nuevosArchivos;
@@ -274,6 +269,7 @@ app.put('/actualizar-servicio/:id', upload.array('evidencias', 10), (req, res) =
     });
 });
 
-app.listen(3000, () => {
-    console.log('Servidor corriendo en http://localhost:3000');
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Servidor corriendo en puerto ${PORT}`);
 });
