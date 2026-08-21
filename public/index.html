@@ -28,7 +28,10 @@
 <!-- Barra de Navegación Profesional -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid px-4">
-        <a class="navbar-brand" href="#"><i class="fa-solid fa-shield-halved text-primary me-2"></i> CATMA Safe México</a>
+        <!-- Logo con fondo blanco y contenedor para resaltar en la barra oscura -->
+        <div class="d-flex align-items-center bg-white px-2 py-1 rounded shadow-sm">
+            <img src="images/Logo web.png" alt="CATMA Safe Logo" style="width: 200px; height: auto; margin-right: 8px;">
+        </div>
         <div class="d-flex align-items-center gap-3">
             <span class="text-light small" id="infoUsuarioConectado">
                 <i class="fa-solid fa-user-circle me-1"></i> Sesión activa
@@ -104,6 +107,7 @@
                                 <th>Estatus</th>
                                 <th>F. Realizado</th>
                                 <th>Observaciones</th>
+                                <th>Evidencias</th>
                                 <th>Acciones</th>
                             </tr>
                             </thead>
@@ -211,6 +215,12 @@
                                 <input type="date" class="form-control form-control-sm" id="fecha_realizado">
                             </div>
 
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold small">Adjuntar Evidencias (Múltiples documentos, imágenes o videos):</label>
+                                <input type="file" class="form-control form-control-sm" id="evidencias" multiple accept=".pdf, .jpg, .jpeg, .png, .mp4, .mov, .avi">
+                                <div id="verEvidenciasActuales" class="form-text"></div>
+                            </div>
+
                             <div class="col-12">
                                 <label class="form-label fw-bold small">Observaciones:</label>
                                 <textarea class="form-control form-control-sm" id="observaciones" rows="2" placeholder="Observaciones generales..."></textarea>
@@ -297,7 +307,7 @@
         window.location.href = '/login.html';
     }
 
-    // 2. Mostrar datos del usuario activo y validar rol de administrador
+    // 2. Mostrar datos del usuario activo, validar rol de administrador y cargar datos automáticamente
     window.addEventListener('DOMContentLoaded', () => {
         const usuarioActivo = localStorage.getItem('usuarioLogueado');
         const rolActivo = localStorage.getItem('rolUsuario');
@@ -309,6 +319,9 @@
         if (rolActivo === 'admin') {
             document.getElementById('li-gestion-usuarios').classList.remove('d-none');
         }
+
+        // Cargar los servicios automáticamente al iniciar la página
+        cargarServicios();
     });
 
     // 3. Función para cerrar sesión
@@ -340,7 +353,7 @@
         tablaBody.innerHTML = '';
 
         if (servicios.length === 0) {
-            tablaBody.innerHTML = `<tr><td colspan="19" class="text-center py-4 text-muted">No se encontraron registros.</td></tr>`;
+            tablaBody.innerHTML = `<tr><td colspan="20" class="text-center py-4 text-muted">No se encontraron registros.</td></tr>`;
             return;
         }
 
@@ -350,6 +363,19 @@
             if (s.estatus === 'Finalizado') badgeClass = 'badge-finalizado';
 
             const fechaRegistro = s.fecha_registro ? s.fecha_registro.split('T')[0] : 'N/A';
+
+            let linksEvidencias = '<span class="text-muted small">Sin archivos</span>';
+            if (s.evidencia) {
+                const archivos = s.evidencia.split(',');
+                linksEvidencias = '<div class="d-flex gap-1 flex-wrap">';
+                archivos.forEach((arch, index) => {
+                    const nombreLimpio = arch.trim();
+                    if (nombreLimpio) {
+                        linksEvidencias += `<a href="/uploads/${nombreLimpio}" target="_blank" class="btn btn-sm btn-outline-info py-0 px-1" title="Ver archivo ${index + 1}"><i class="fa-solid fa-file-arrow-down"></i> #${index + 1}</a>`;
+                    }
+                });
+                linksEvidencias += '</div>';
+            }
 
             tablaBody.innerHTML += `
                 <tr>
@@ -371,6 +397,7 @@
                     <td><span class="badge ${badgeClass} px-2 py-1">${s.estatus}</span></td>
                     <td>${s.fecha_realizado ? s.fecha_realizado.split('T')[0] : 'N/A'}</td>
                     <td>${s.observaciones || 'N/A'}</td>
+                    <td>${linksEvidencias}</td>
                     <td>
                         <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="cargarParaEditar(${s.id})" title="Editar registro"><i class="fa-solid fa-pen-to-square"></i></button>
                     </td>
@@ -388,12 +415,10 @@
         const filtrados = listaServicios.filter(s => {
             const fechaReg = s.fecha_registro ? s.fecha_registro.split('T')[0] : '';
 
-            // Filtro por fecha
             let cumpleFecha = true;
             if (inicio && fechaReg < inicio) cumpleFecha = false;
             if (fin && fechaReg > fin) cumpleFecha = false;
 
-            // Filtro por texto
             const cumpleTexto = (
                 !texto ||
                 (s.id_cliente && s.id_cliente.toLowerCase().includes(texto)) ||
@@ -443,6 +468,14 @@
         document.getElementById('fecha_realizado').value = servicio.fecha_realizado ? servicio.fecha_realizado.split('T')[0] : '';
         document.getElementById('observaciones').value = servicio.observaciones || '';
 
+        document.getElementById('evidencias').value = '';
+        const infoEvidencias = document.getElementById('verEvidenciasActuales');
+        if (servicio.evidencia) {
+            infoEvidencias.innerHTML = `Archivos actuales guardados: <b>${servicio.evidencia}</b>`;
+        } else {
+            infoEvidencias.innerHTML = `No hay archivos de evidencia adjuntos actualmente.`;
+        }
+
         document.getElementById('tituloFormulario').innerHTML = `<i class="fa-solid fa-pen-to-square text-warning me-2"></i> Editando Registro ID: ${servicio.id}`;
         document.getElementById('btnGuardar').innerHTML = `<i class="fa-solid fa-floppy-disk me-2"></i> Actualizar Registro`;
 
@@ -453,34 +486,40 @@
     function resetearFormulario() {
         document.getElementById('servicioCompletoForm').reset();
         document.getElementById('registro_id').value = '';
+        document.getElementById('verEvidenciasActuales').innerHTML = '';
         document.getElementById('tituloFormulario').innerHTML = `<i class="fa-solid fa-file-pen text-primary me-2"></i> Formulario de Registro de Servicio`;
         document.getElementById('btnGuardar').innerHTML = `<i class="fa-solid fa-floppy-disk me-2"></i> Guardar Registro`;
     }
 
-    // Guardar / Actualizar Servicio
+    // Guardar / Actualizar Servicio con soporte para múltiples archivos
     document.getElementById('servicioCompletoForm').addEventListener('submit', async function(e) {
         e.preventDefault();
 
         const id = document.getElementById('registro_id').value;
-        const datos = {
-            id_cliente: document.getElementById('id_cliente').value,
-            nombre: document.getElementById('nombre').value,
-            pedido: document.getElementById('pedido').value,
-            remision: document.getElementById('remision').value,
-            poliza: document.getElementById('poliza').value,
-            modelo: document.getElementById('modelo').value,
-            serie: document.getElementById('serie').value,
-            ubicacion: document.getElementById('ubicacion').value,
-            telefono: document.getElementById('telefono').value,
-            tipo_servicio: document.getElementById('tipo_servicio').value,
-            asesor: document.getElementById('asesor').value,
-            fecha_programado: document.getElementById('fecha_programado').value,
-            fecha_confirmada: document.getElementById('fecha_confirmada').value,
-            tecnico_asignado: document.getElementById('tecnico_asignado').value,
-            estatus: document.getElementById('estatus').value,
-            fecha_realizado: document.getElementById('fecha_realizado').value,
-            observaciones: document.getElementById('observaciones').value
-        };
+        const formData = new FormData();
+
+        formData.append('id_cliente', document.getElementById('id_cliente').value);
+        formData.append('nombre', document.getElementById('nombre').value);
+        formData.append('pedido', document.getElementById('pedido').value);
+        formData.append('remision', document.getElementById('remision').value);
+        formData.append('poliza', document.getElementById('poliza').value);
+        formData.append('modelo', document.getElementById('modelo').value);
+        formData.append('serie', document.getElementById('serie').value);
+        formData.append('ubicacion', document.getElementById('ubicacion').value);
+        formData.append('telefono', document.getElementById('telefono').value);
+        formData.append('tipo_servicio', document.getElementById('tipo_servicio').value);
+        formData.append('asesor', document.getElementById('asesor').value);
+        formData.append('fecha_programado', document.getElementById('fecha_programado').value);
+        formData.append('fecha_confirmada', document.getElementById('fecha_confirmada').value);
+        formData.append('tecnico_asignado', document.getElementById('tecnico_asignado').value);
+        formData.append('estatus', document.getElementById('estatus').value);
+        formData.append('fecha_realizado', document.getElementById('fecha_realizado').value);
+        formData.append('observaciones', document.getElementById('observaciones').value);
+
+        const archivosInput = document.getElementById('evidencias');
+        for (let i = 0; i < archivosInput.files.length; i++) {
+            formData.append('evidencias', archivosInput.files[i]);
+        }
 
         const url = id ? `/actualizar-servicio/${id}` : '/guardar-servicio-completo';
         const metodo = id ? 'PUT' : 'POST';
@@ -488,8 +527,7 @@
         try {
             const respuesta = await fetch(url, {
                 method: metodo,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(datos)
+                body: formData
             });
 
             const mensaje = await respuesta.text();
@@ -528,52 +566,26 @@
         }
 
         usuarios.forEach(u => {
-            let badgeRol = u.rol === 'admin' ? 'bg-danger' : 'bg-secondary';
-            tbody.innerHTML += `
+            tbody.innerHTML = tbody.innerHTML + `
                 <tr>
                     <td>${u.id}</td>
                     <td class="fw-bold">${u.nombre_usuario}</td>
-                    <td><span class="badge ${badgeRol}">${u.rol}</span></td>
+                    <td><span class="badge ${u.rol === 'admin' ? 'bg-danger' : 'bg-secondary'}">${u.rol}</span></td>
                     <td class="text-center">
-                        <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="cargarUsuarioParaEditar(${u.id})" title="Editar"><i class="fa-solid fa-pen"></i></button>
-                        <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="eliminarUsuario(${u.id})" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+                        <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="cargarUsuarioParaEditar(${u.id})" title="Editar usuario"><i class="fa-solid fa-user-pen"></i></button>
+                        <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="eliminarUsuario(${u.id})" title="Eliminar usuario"><i class="fa-solid fa-user-xmark"></i></button>
                     </td>
                 </tr>
             `;
         });
     }
 
-    function cargarUsuarioParaEditar(id) {
-        const u = listaUsuarios.find(x => x.id === id);
-        if (!u) return;
-
-        document.getElementById('usuario_id').value = u.id;
-        document.getElementById('nuevo_nombre_usuario').value = u.nombre_usuario;
-        document.getElementById('nuevo_password').value = '';
-        document.getElementById('labelPassHelp').innerText = '(Déjalo en blanco si no deseas cambiarla)';
-        document.getElementById('nuevo_rol').value = u.rol;
-
-        document.getElementById('tituloUsuarioForm').innerHTML = `<i class="fa-solid fa-pen text-warning me-2"></i> Editando Usuario ID: ${u.id}`;
-        document.getElementById('btnGuardarUsuario').innerHTML = `<i class="fa-solid fa-floppy-disk me-2"></i> Actualizar Usuario`;
-    }
-
-    function resetearUsuarioForm() {
-        document.getElementById('crearUsuarioForm').reset();
-        document.getElementById('usuario_id').value = '';
-        document.getElementById('labelPassHelp').innerText = '';
-        document.getElementById('tituloUsuarioForm').innerHTML = `<i class="fa-solid fa-user-plus text-primary me-2"></i> Nuevo Usuario`;
-        document.getElementById('btnGuardarUsuario').innerHTML = `<i class="fa-solid fa-user-check me-2"></i> Registrar Usuario`;
-    }
-
     document.getElementById('crearUsuarioForm').addEventListener('submit', async function(e) {
         e.preventDefault();
-
         const id = document.getElementById('usuario_id').value;
-        const datosUsuario = {
-            nombre_usuario: document.getElementById('nuevo_nombre_usuario').value,
-            password: document.getElementById('nuevo_password').value,
-            rol: document.getElementById('nuevo_rol').value
-        };
+        const nombre_usuario = document.getElementById('nuevo_nombre_usuario').value;
+        const password = document.getElementById('nuevo_password').value;
+        const rol = document.getElementById('nuevo_rol').value;
 
         const url = id ? `/actualizar-usuario/${id}` : '/crear-usuario';
         const metodo = id ? 'PUT' : 'POST';
@@ -582,39 +594,49 @@
             const respuesta = await fetch(url, {
                 method: metodo,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(datosUsuario)
+                body: JSON.stringify({ nombre_usuario, password, rol })
             });
-
             const mensaje = await respuesta.text();
             alert(mensaje);
-
-            if (respuesta.ok) {
-                resetearUsuarioForm();
-                cargarUsuarios();
-            }
+            resetearUsuarioForm();
+            cargarUsuarios();
         } catch (error) {
             console.error('Error:', error);
-            alert('Hubo un error al procesar el usuario.');
+            alert('Error al guardar el usuario.');
         }
     });
 
-    async function eliminarUsuario(id) {
-        if (!confirm('¿Estás seguro de que deseas eliminar este usuario?')) return;
+    function cargarUsuarioParaEditar(id) {
+        const usuario = listaUsuarios.find(u => u.id === id);
+        if (!usuario) return;
 
+        document.getElementById('usuario_id').value = usuario.id;
+        document.getElementById('nuevo_nombre_usuario').value = usuario.nombre_usuario;
+        document.getElementById('nuevo_password').value = '';
+        document.getElementById('nuevo_rol').value = usuario.rol;
+        document.getElementById('tituloUsuarioForm').innerHTML = `<i class="fa-solid fa-user-pen text-warning me-2"></i> Editando: ${usuario.nombre_usuario}`;
+        document.getElementById('btnGuardarUsuario').innerHTML = `<i class="fa-solid fa-user-check me-2"></i> Actualizar Usuario`;
+    }
+
+    function resetearUsuarioForm() {
+        document.getElementById('crearUsuarioForm').reset();
+        document.getElementById('usuario_id').value = '';
+        document.getElementById('tituloUsuarioForm').innerHTML = `<i class="fa-solid fa-user-plus text-primary me-2"></i> Nuevo Usuario`;
+        document.getElementById('btnGuardarUsuario').innerHTML = `<i class="fa-solid fa-user-check me-2"></i> Registrar Usuario`;
+    }
+
+    async function eliminarUsuario(id) {
+        if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
         try {
-            const respuesta = await fetch(`/eliminar-usuario/${id}`, {
-                method: 'DELETE'
-            });
+            const respuesta = await fetch(`/eliminar-usuario/${id}`, { method: 'DELETE' });
             const mensaje = await respuesta.text();
             alert(mensaje);
             cargarUsuarios();
         } catch (error) {
-            console.error('Error al eliminar:', error);
-            alert('No se pudo eliminar el usuario.');
+            console.error('Error:', error);
+            alert('Error al eliminar el usuario.');
         }
     }
-
-    cargarServicios();
 </script>
 </body>
 </html>

@@ -2,6 +2,8 @@ const express = require('express');
 const mysql = require('mysql2');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 app.use(express.json());
@@ -30,6 +32,35 @@ db.connect((err) => {
         return;
     }
     console.log('¡Conectado a la base de datos exitosamente!');
+});
+
+// Configuración de Multer para guardar archivos de evidencias (múltiples)
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, 'public', 'uploads');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // Límite de 5MB por archivo
+    fileFilter: (req, file, cb) => {
+        const filetypes = /jpeg|jpg|png|pdf|mp4|mov|avi/;
+        const mimetype = filetypes.test(file.mimetype);
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        if (mimetype && extname) {
+            return cb(null, true);
+        }
+        cb(new Error("Solo se permiten archivos de imagen, PDF o video."));
+    }
 });
 
 // Inicialización de tabla usuarios y admin
@@ -66,6 +97,23 @@ db.query(`
         db.query(`ALTER TABLE servicios_mantenimiento_completo ADD COLUMN fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, (alterErr) => {
             if (!alterErr) {
                 console.log('¡Columna fecha_registro agregada exitosamente a servicios_mantenimiento_completo!');
+            }
+        });
+    }
+});
+
+// Verificar y asegurar la columna evidencia en la tabla de servicios (Tipo TEXT para guardar múltiples nombres)
+db.query(`
+    SELECT COLUMN_NAME, DATA_TYPE 
+    FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = 'catma_servicios_db' 
+      AND TABLE_NAME = 'servicios_mantenimiento_completo' 
+      AND COLUMN_NAME = 'evidencia'
+`, (err, results) => {
+    if (!err && results.length === 0) {
+        db.query(`ALTER TABLE servicios_mantenimiento_completo ADD COLUMN evidencia TEXT NULL`, (alterErr) => {
+            if (!alterErr) {
+                console.log('¡Columna evidencia agregada exitosamente a servicios_mantenimiento_completo!');
             }
         });
     }
@@ -141,45 +189,88 @@ app.get('/obtener-servicios', (req, res) => {
     });
 });
 
-app.post('/guardar-servicio-completo', (req, res) => {
-    const query = `INSERT INTO servicios_mantenimiento_completo (id_cliente, nombre, pedido, remision, poliza, modelo, serie, ubicacion, telefono, tipo_servicio, asesor, fecha_programado, fecha_confirmada, tecnico_asignado, estatus, fecha_realizado, observaciones) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const values = Object.values(req.body);
-    db.query(query, values, (err) => {
-        if (err) return res.status(500).send('Error al guardar.');
-        res.send('¡Servicio registrado exitosamente!');
-    });
-});
-
-app.put('/actualizar-servicio/:id', (req, res) => {
+app.post('/guardar-servicio-completo', upload.array('evidencias', 10), (req, res) => {
     const {
         id_cliente, nombre, pedido, remision, poliza, modelo, serie,
         ubicacion, telefono, tipo_servicio, asesor, fecha_programado,
         fecha_confirmada, tecnico_asignado, estatus, fecha_realizado, observaciones
     } = req.body;
 
+    // Procesar múltiples archivos subidos
+    let nombresArchivos = null;
+    if (req.files && req.files.length > 0) {
+        nombresArchivos = req.files.map(file => file.filename).join(',');
+    }
+
     const query = `
-        UPDATE servicios_mantenimiento_completo 
-        SET id_cliente = ?, nombre = ?, pedido = ?, remision = ?, poliza = ?, 
-            modelo = ?, serie = ?, ubicacion = ?, telefono = ?, tipo_servicio = ?, 
-            asesor = ?, fecha_programado = ?, fecha_confirmada = ?, 
-            tecnico_asignado = ?, estatus = ?, fecha_realizado = ?, observaciones = ? 
-        WHERE id = ?
+        INSERT INTO servicios_mantenimiento_completo 
+        (id_cliente, nombre, pedido, remision, poliza, modelo, serie, ubicacion, telefono, tipo_servicio, asesor, fecha_programado, fecha_confirmada, tecnico_asignado, estatus, fecha_realizado, observaciones, evidencia) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
         id_cliente, nombre, pedido || null, remision || null, poliza || null,
         modelo || null, serie || null, ubicacion || null, telefono || null,
         tipo_servicio, asesor, fecha_programado || null, fecha_confirmada || null,
-        tecnico_asignado || null, estatus, fecha_realizado || null, observaciones || null,
-        req.params.id
+        tecnico_asignado || null, estatus, fecha_realizado || null, observaciones || null, nombresArchivos
     ];
 
     db.query(query, values, (err) => {
         if (err) {
-            console.error('Error al actualizar servicio:', err);
+            console.error('Error al guardar servicio:', err);
+            return res.status(500).send('Error al guardar.');
+        }
+        res.send('¡Servicio registrado exitosamente con sus evidencias!');
+    });
+});
+
+app.put('/actualizar-servicio/:id', upload.array('evidencias', 10), (req, res) => {
+    const servicioId = req.params.id;
+    const {
+        id_cliente, nombre, pedido, remision, poliza, modelo, serie,
+        ubicacion, telefono, tipo_servicio, asesor, fecha_programado,
+        fecha_confirmada, tecnico_asignado, estatus, fecha_realizado, observaciones
+    } = req.body;
+
+    // Consultar primero las evidencias anteriores para no perderlas
+    db.query('SELECT evidencia FROM servicios_mantenimiento_completo WHERE id = ?', [servicioId], (err, rows) => {
+        if (err) {
+            console.error('Error al consultar servicio:', err);
             return res.status(500).send('Error al actualizar.');
         }
-        res.send('¡Servicio actualizado exitosamente!');
+
+        let evidenciasFinales = rows[0]?.evidencia || '';
+
+        // Si el usuario subió nuevos archivos, los agregamos a los existentes
+        if (req.files && req.files.length > 0) {
+            const nuevosArchivos = req.files.map(file => file.filename).join(',');
+            evidenciasFinales = evidenciasFinales ? `${evidenciasFinales},${nuevosArchivos}` : nuevosArchivos;
+        }
+
+        const query = `
+            UPDATE servicios_mantenimiento_completo 
+            SET id_cliente = ?, nombre = ?, pedido = ?, remision = ?, poliza = ?, 
+                modelo = ?, serie = ?, ubicacion = ?, telefono = ?, tipo_servicio = ?, 
+                asesor = ?, fecha_programado = ?, fecha_confirmada = ?, 
+                tecnico_asignado = ?, estatus = ?, fecha_realizado = ?, observaciones = ?, evidencia = ? 
+            WHERE id = ?
+        `;
+
+        const values = [
+            id_cliente, nombre, pedido || null, remision || null, poliza || null,
+            modelo || null, serie || null, ubicacion || null, telefono || null,
+            tipo_servicio, asesor, fecha_programado || null, fecha_confirmada || null,
+            tecnico_asignado || null, estatus, fecha_realizado || null, observaciones || null,
+            evidenciasFinales || null, servicioId
+        ];
+
+        db.query(query, values, (err2) => {
+            if (err2) {
+                console.error('Error al actualizar servicio:', err2);
+                return res.status(500).send('Error al actualizar.');
+            }
+            res.send('¡Servicio actualizado exitosamente!');
+        });
     });
 });
 
