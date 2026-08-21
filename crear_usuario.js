@@ -1,24 +1,25 @@
 const bcrypt = require('bcryptjs');
 const mysql = require('mysql2');
 
+// Conexión directa a la base de datos de Hostinger
 const db = mysql.createConnection({
-    host: '127.0.0.1',
-    port: 3307,
-    user: 'root',
-    password: '123456',
-    database: 'catma_servicios_db'
+    host: 'localhost', // o puedes usar el host remoto si Hostinger te lo pide
+    user: 'u742254071_catma_db_user',
+    password: 'Catma:2026,',
+    database: 'u742254071_servicios_db'
 });
 
 async function registrarUsuario(nombreUsuario, passwordPlana, rol) {
     try {
         const hash = await bcrypt.hash(passwordPlana, 10);
+        // Nota: Asegúrate de que tu tabla de usuarios use 'nombre_usuario' o 'usuario' según tu estructura
         const query = 'INSERT INTO usuarios (nombre_usuario, password_hash, rol) VALUES (?, ?, ?)';
 
         db.query(query, [nombreUsuario, hash, rol], (err) => {
             if (err) {
                 console.error(`Error al crear a ${nombreUsuario}:`, err.message);
             } else {
-                console.log(`¡Usuario '${nombreUsuario}' (${rol}) creado exitosamente!`);
+                console.log(`¡Usuario '${nombreUsuario}' (${rol}) creado exitosamente en Hostinger!`);
             }
             db.end();
         });
@@ -27,5 +28,5 @@ async function registrarUsuario(nombreUsuario, passwordPlana, rol) {
     }
 }
 
-// Cambia estos datos para crear nuevos usuarios:
-registrarUsuario('carla.sanchez', 'miPassword123', 'colaborador');
+// Creamos al administrador que estás intentando usar en la web
+registrarUsuario('admin', 'TuContraseñaSeguraAdmin', 'administrador');
