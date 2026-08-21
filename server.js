@@ -17,7 +17,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Conexión dinámica optimizada para Hostinger y desarrollo local
+// Conexión directa y fija con tus datos reales de Hostinger
 const db = mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'u742254071_catma_db_user',
@@ -51,7 +51,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // Límite de 5MB por archivo
+    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const filetypes = /jpeg|jpg|png|pdf|mp4|mov|avi/;
         const mimetype = filetypes.test(file.mimetype);
@@ -63,61 +63,7 @@ const upload = multer({
     }
 });
 
-// Inicialización de tabla usuarios y admin
-db.query(`
-    CREATE TABLE IF NOT EXISTS usuarios (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        nombre_usuario VARCHAR(50) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        rol VARCHAR(20) DEFAULT 'colaborador'
-    )
-`, async (err) => {
-    if (!err) {
-        db.query('SELECT * FROM usuarios WHERE nombre_usuario = ?', ['admin'], async (err, results) => {
-            if (results.length === 0) {
-                const hash = await bcrypt.hash('123456', 10);
-                db.query('INSERT INTO usuarios (nombre_usuario, password_hash, rol) VALUES (?, ?, ?)',
-                    ['admin', hash, 'administrador'], () => {
-                        console.log('¡Usuario administrador inicializado: admin / 123456!');
-                    });
-            }
-        });
-    }
-});
-
-// Verificar y asegurar la columna fecha_registro en la tabla de servicios
-db.query(`
-    SELECT COLUMN_NAME 
-    FROM INFORMATION_SCHEMA.COLUMNS 
-    WHERE TABLE_NAME = 'servicios_mantenimiento_completo' 
-      AND COLUMN_NAME = 'fecha_registro'
-`, (err, results) => {
-    if (!err && results.length === 0) {
-        db.query(`ALTER TABLE servicios_mantenimiento_completo ADD COLUMN fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, (alterErr) => {
-            if (!alterErr) {
-                console.log('¡Columna fecha_registro agregada exitosamente a servicios_mantenimiento_completo!');
-            }
-        });
-    }
-});
-
-// Verificar y asegurar la columna evidencia en la tabla de servicios (Tipo TEXT para guardar múltiples nombres)
-db.query(`
-    SELECT COLUMN_NAME, DATA_TYPE 
-    FROM INFORMATION_SCHEMA.COLUMNS 
-    WHERE TABLE_NAME = 'servicios_mantenimiento_completo' 
-      AND COLUMN_NAME = 'evidencia'
-`, (err, results) => {
-    if (!err && results.length === 0) {
-        db.query(`ALTER TABLE servicios_mantenimiento_completo ADD COLUMN evidencia TEXT NULL`, (alterErr) => {
-            if (!alterErr) {
-                console.log('¡Columna evidencia agregada exitosamente a servicios_mantenimiento_completo!');
-            }
-        });
-    }
-});
-
-// --- RUTAS DE AUTENTICACIÓN ---
+// --- RUTA DE AUTENTICACIÓN DIRECTA ---
 
 app.post('/login', (req, res) => {
     const { nombre_usuario, password } = req.body;
@@ -130,10 +76,24 @@ app.post('/login', (req, res) => {
         }
         console.log('[LOGIN DB] Resultados obtenidos:', results);
 
-        if (results.length === 0) return res.status(401).send('Usuario no encontrado.');
+        if (!results || results.length === 0) {
+            return res.status(401).send('Usuario no encontrado.');
+        }
+
         const usuario = results[0];
-        const match = await bcrypt.compare(password, usuario.password_hash);
-        if (!match) return res.status(401).send('Contraseña incorrecta.');
+
+        // Verificación directa de contraseña (soporta tanto bcrypt como texto plano si llegara a requerirse)
+        let match = false;
+        try {
+            match = await bcrypt.compare(password, usuario.password_hash);
+        } catch (e) {
+            match = (password === usuario.password_hash);
+        }
+
+        if (!match) {
+            return res.status(401).send('Contraseña incorrecta.');
+        }
+
         res.json({ usuario: usuario.nombre_usuario, rol: usuario.rol });
     });
 });
