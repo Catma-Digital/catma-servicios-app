@@ -18,12 +18,13 @@ app.get('/', (req, res) => {
 });
 
 // Conexión directa y fija con tus datos reales de Hostinger
+// Conexión forzada con los datos exactos de tu base de datos en Hostinger
 const db = mysql.createConnection({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'u742254071_catma_db_user',
-    password: process.env.DB_PASSWORD || 'Catma:2026.',
-    database: process.env.DB_NAME || 'u742254071_servicios_db',
-    port: process.env.DB_PORT || 3306
+    host: 'auth-db1539.hostinger.com', // Cambia 'localhost' por el host exacto que te da phpMyAdmin arriba en su pestaña superior
+    user: 'u742254071_catma_db_user',
+    password: 'Catma:2026.',
+    database: 'u742254071_servicios_db',
+    port: 3306
 });
 
 db.connect((err) => {
