@@ -83,7 +83,7 @@
         alertaError.classList.add('d-none');
 
         try {
-            const respuesta = await fetch('/login', {
+                const respuesta = await fetch('https://servicios.catma.mx/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ nombre_usuario, password })
