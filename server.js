@@ -17,29 +17,29 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Pool de conexiones optimizado para Hostinger (evita que la conexión muera por inactividad)
+// Pool de conexiones optimizado (Cambiado a 127.0.0.1 según tu captura de phpMyAdmin)
 const db = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
+    host: process.env.DB_HOST || '127.0.0.1',
+    user: process.env.DB_USER || 'u742254071_catma_db_user',
+    password: process.env.DB_PASSWORD || 'Catma:2026.',
+    database: process.env.DB_NAME || 'u742254071_servicios_db',
     port: process.env.DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
 });
 
-// Prueba inicial del pool
+// Prueba inicial detallada del pool
 db.getConnection((err, connection) => {
     if (err) {
-        console.error('Error al conectar al Pool de la BD:', err);
+        console.error('❌ ERROR CRÍTICO AL CONECTAR A LA BD:', err.message);
         return;
     }
-    console.log('¡Conectado al Pool de la base de datos exitosamente!');
+    console.log('¡Conectado exitosamente al Pool de la base de datos!');
     connection.release();
 });
 
-// Configuración de Multer para guardar archivos de evidencias (múltiples)
+// Configuración de Multer
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = path.join(__dirname, 'public', 'uploads');
@@ -59,39 +59,53 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const filetypes = /jpeg|jpg|png|pdf|mp4|mov|avi/;
-        const mimetype = filetypes.test(file.mimetype);
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-        if (mimetype && extname) {
+        if (filetypes.test(file.mimetype) && filetypes.test(path.extname(file.originalname).toLowerCase())) {
             return cb(null, true);
         }
         cb(new Error("Solo se permiten archivos de imagen, PDF o video."));
     }
 });
 
-// --- RUTA DE AUTENTICACIÓN ROBUSTA ---
+// --- RUTA DE AUTENTICACIÓN: MODO DIAGNÓSTICO EXTREMO ---
 
 app.post('/login', (req, res) => {
-    console.log('[BODY RECIBIDO]:', req.body);
     const { nombre_usuario, password } = req.body;
 
-    db.query('SELECT * FROM usuarios WHERE nombre_usuario = ?', [nombre_usuario], async (err, results) => {
-        if (err) {
-            console.error('[LOGIN ERROR DB]:', err);
-            return res.status(500).send('Error de base de datos.');
-        }
-        console.log('[LOGIN DB] Resultados obtenidos:', results);
+    // 1. Validar si el frontend realmente está enviando los datos
+    if (!nombre_usuario || !password) {
+        return res.status(400).json({
+            error: "Datos incompletos",
+            mensaje: "El servidor Node.js recibió los datos en blanco.",
+            body_recibido: req.body
+        });
+    }
 
+    // 2. Buscar usando TRIM y LOWER para evitar errores de mayúsculas o espacios accidentales
+    const query = 'SELECT * FROM usuarios WHERE LOWER(TRIM(nombre_usuario)) = LOWER(TRIM(?))';
+
+    db.query(query, [nombre_usuario], async (err, results) => {
+        if (err) {
+            return res.status(500).json({
+                error: 'Error interno de base de datos.',
+                detalle: err.message
+            });
+        }
+
+        // 3. Si no encuentra nada, devuelve exactamente qué fue lo que buscó
         if (!results || results.length === 0) {
-            console.log('[LOGIN] Usuario no encontrado en el resultado de la consulta.');
-            return res.status(401).send('Usuario no encontrado.');
+            return res.status(401).json({
+                error: 'Usuario no encontrado en la base de datos.',
+                usuario_que_buscaste: nombre_usuario,
+                datos_recibidos_del_frontend: req.body
+            });
         }
 
         const usuario = results[0];
 
-        // Verificación de contraseña compatible con texto plano y bcrypt
+        // 4. Verificación de contraseña robusta
         let match = false;
         if (password === usuario.password_hash) {
-            match = true;
+            match = true; // Coincide en texto plano
         } else {
             try {
                 match = await bcrypt.compare(password, usuario.password_hash);
@@ -101,11 +115,13 @@ app.post('/login', (req, res) => {
         }
 
         if (!match) {
-            console.log('[LOGIN] Contraseña incorrecta.');
-            return res.status(401).send('Contraseña incorrecta.');
+            return res.status(401).json({
+                error: 'Contraseña incorrecta.',
+                hash_en_db_detectado: usuario.password_hash
+            });
         }
 
-        console.log('[LOGIN EXITOSO]');
+        // 5. ¡Éxito!
         res.json({ usuario: usuario.nombre_usuario, rol: usuario.rol });
     });
 });
