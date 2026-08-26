@@ -19,11 +19,11 @@ app.get('/', (req, res) => {
 
 // Pool de conexiones optimizado para Hostinger (evita que la conexión muera por inactividad)
 const db = mysql.createPool({
-    host: 'localhost', // En el entorno de Node.js de Hostinger, la comunicación local es por socket/localhost
-    user: 'u742254071_catma_db_user',
-    password: 'Catma:2026.',
-    database: 'u742254071_servicios_db',
-    port: 3306,
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
@@ -71,8 +71,8 @@ const upload = multer({
 // --- RUTA DE AUTENTICACIÓN ROBUSTA ---
 
 app.post('/login', (req, res) => {
+    console.log('[BODY RECIBIDO]:', req.body);
     const { nombre_usuario, password } = req.body;
-    console.log(`[LOGIN INTENTO] Buscando usuario: "${nombre_usuario}"`);
 
     db.query('SELECT * FROM usuarios WHERE nombre_usuario = ?', [nombre_usuario], async (err, results) => {
         if (err) {
@@ -250,6 +250,6 @@ app.put('/actualizar-servicio/:id', upload.array('evidencias', 10), (req, res) =
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor corriendo en puerto ${PORT}`);
 });
