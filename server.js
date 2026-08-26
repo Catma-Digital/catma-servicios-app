@@ -19,7 +19,7 @@ app.get('/', (req, res) => {
 
 // Pool de conexiones optimizado para Hostinger (evita que la conexión muera por inactividad)
 const db = mysql.createPool({
-    host: 'auth-db1539.hostinger.com',
+    host: 'localhost', // En el entorno de Node.js de Hostinger, la comunicación local es por socket/localhost
     user: 'u742254071_catma_db_user',
     password: 'Catma:2026.',
     database: 'u742254071_servicios_db',
