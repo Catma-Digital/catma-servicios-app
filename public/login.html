@@ -82,7 +82,6 @@
         alertaError.classList.add('d-none');
 
         try {
-            // Usamos ruta relativa segura para evitar bloqueos de CORS o dominio cruzado
             const respuesta = await fetch('/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -90,6 +89,7 @@
             });
 
             const contentType = respuesta.headers.get("content-type");
+            console.log("Estado respuesta:", respuesta.status, contentType);
 
             if (respuesta.ok) {
                 let datos;
