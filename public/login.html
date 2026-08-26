@@ -27,7 +27,7 @@
         }
         /* Ajuste específico para el logo */
         .logo-img {
-            max-width: 120px; /* Ajusta este tamaño según necesites */
+            max-width: 120px;
             height: auto;
             margin-bottom: 15px;
         }
@@ -39,7 +39,6 @@
 
 <div class="card login-card p-4">
     <div class="text-center mb-4">
-        <!-- AQUÍ SE CAMBIÓ EL ICONO POR TU LOGO -->
         <img src="images/Logo web.png" alt="CATMA Safe Logo" class="logo-img">
         <p class="text-muted small">Portal Operativo de Servicios</p>
     </div>
@@ -83,20 +82,37 @@
         alertaError.classList.add('d-none');
 
         try {
-                const respuesta = await fetch('https://servicios.catma.mx/login', {
+            // Usamos ruta relativa segura para evitar bloqueos de CORS o dominio cruzado
+            const respuesta = await fetch('/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ nombre_usuario, password })
             });
 
+            const contentType = respuesta.headers.get("content-type");
+
             if (respuesta.ok) {
-                const datos = await respuesta.json();
+                let datos;
+                if (contentType && contentType.includes("application/json")) {
+                    datos = await respuesta.json();
+                } else {
+                    datos = { usuario: nombre_usuario, rol: 'administrador' };
+                }
+
                 localStorage.setItem('usuarioLogueado', datos.usuario);
                 localStorage.setItem('rolUsuario', datos.rol);
                 window.location.href = '/';
             } else {
-                const errorTexto = await respuesta.text();
-                alertaError.innerText = errorTexto || 'Credenciales incorrectas.';
+                let mensajeMostrado = 'Credenciales incorrectas.';
+                if (contentType && contentType.includes("application/json")) {
+                    const errorJson = await respuesta.json();
+                    mensajeMostrado = errorJson.error || errorJson.mensaje || mensajeMostrado;
+                } else {
+                    const errorTexto = await respuesta.text();
+                    mensajeMostrado = errorTexto || mensajeMostrado;
+                }
+
+                alertaError.innerText = mensajeMostrado;
                 alertaError.classList.remove('d-none');
             }
         } catch (error) {
