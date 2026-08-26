@@ -17,22 +17,26 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Conexión directa y fija con tus datos reales de Hostinger
-// Conexión forzada con los datos exactos de tu base de datos en Hostinger
-const db = mysql.createConnection({
-    host: 'auth-db1539.hostinger.com', // Cambia 'localhost' por el host exacto que te da phpMyAdmin arriba en su pestaña superior
+// Pool de conexiones optimizado para Hostinger (evita que la conexión muera por inactividad)
+const db = mysql.createPool({
+    host: 'auth-db1539.hostinger.com',
     user: 'u742254071_catma_db_user',
     password: 'Catma:2026.',
     database: 'u742254071_servicios_db',
-    port: 3306
+    port: 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
 });
 
-db.connect((err) => {
+// Prueba inicial del pool
+db.getConnection((err, connection) => {
     if (err) {
-        console.error('Error al conectar a la BD:', err);
+        console.error('Error al conectar al Pool de la BD:', err);
         return;
     }
-    console.log('¡Conectado a la base de datos exitosamente!');
+    console.log('¡Conectado al Pool de la base de datos exitosamente!');
+    connection.release();
 });
 
 // Configuración de Multer para guardar archivos de evidencias (múltiples)
@@ -64,37 +68,44 @@ const upload = multer({
     }
 });
 
-// --- RUTA DE AUTENTICACIÓN DIRECTA ---
+// --- RUTA DE AUTENTICACIÓN ROBUSTA ---
 
 app.post('/login', (req, res) => {
     const { nombre_usuario, password } = req.body;
-    console.log(`[LOGIN] Intentando acceder con el usuario: "${nombre_usuario}"`);
+    console.log(`[LOGIN INTENTO] Buscando usuario: "${nombre_usuario}"`);
 
     db.query('SELECT * FROM usuarios WHERE nombre_usuario = ?', [nombre_usuario], async (err, results) => {
         if (err) {
-            console.error('[LOGIN ERROR] Error en la consulta:', err);
+            console.error('[LOGIN ERROR DB]:', err);
             return res.status(500).send('Error de base de datos.');
         }
         console.log('[LOGIN DB] Resultados obtenidos:', results);
 
         if (!results || results.length === 0) {
+            console.log('[LOGIN] Usuario no encontrado en el resultado de la consulta.');
             return res.status(401).send('Usuario no encontrado.');
         }
 
         const usuario = results[0];
 
-        // Verificación directa de contraseña (soporta tanto bcrypt como texto plano si llegara a requerirse)
+        // Verificación de contraseña compatible con texto plano y bcrypt
         let match = false;
-        try {
-            match = await bcrypt.compare(password, usuario.password_hash);
-        } catch (e) {
-            match = (password === usuario.password_hash);
+        if (password === usuario.password_hash) {
+            match = true;
+        } else {
+            try {
+                match = await bcrypt.compare(password, usuario.password_hash);
+            } catch (e) {
+                match = false;
+            }
         }
 
         if (!match) {
+            console.log('[LOGIN] Contraseña incorrecta.');
             return res.status(401).send('Contraseña incorrecta.');
         }
 
+        console.log('[LOGIN EXITOSO]');
         res.json({ usuario: usuario.nombre_usuario, rol: usuario.rol });
     });
 });
