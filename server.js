@@ -59,73 +59,9 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- RUTA LOGIN (HTML INCRUSTADO) ---
+// --- RUTA LOGIN (DEVUELVE EL ARCHIVO FÍSICO login.html) ---
 app.get('/login', (req, res) => {
-    res.send(`<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CATMA Safe México - Login Oficial</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body { background-color: #0f172a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .login-card { border: none; box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3); border-radius: 1rem; width: 100%; max-width: 400px; background-color: #ffffff; }
-        .btn-primary { background-color: #0f172a; border-color: #0f172a; }
-        .btn-primary:hover { background-color: #1e293b; border-color: #1e293b; }
-    </style>
-</head>
-<body>
-<div class="card login-card p-4">
-    <div class="text-center mb-4">
-        <h4 class="fw-bold text-dark">CATMA Safe México</h4>
-        <p class="text-muted small">Portal Operativo de Servicios</p>
-    </div>
-    <form id="loginForm">
-        <div class="mb-3">
-            <label class="form-label fw-bold small text-secondary">Usuario:</label>
-            <input type="text" class="form-control" id="nombre_usuario" required value="admin">
-        </div>
-        <div class="mb-4">
-            <label class="form-label fw-bold small text-secondary">Contraseña:</label>
-            <input type="password" class="form-control" id="password" required value="admin123">
-        </div>
-        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow-sm">Ingresar al Portal</button>
-        <div id="mensajeError" class="alert alert-danger mt-3 py-2 text-center small d-none" role="alert"></div>
-    </form>
-</div>
-<script>
-    document.getElementById('loginForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const nombre_usuario = document.getElementById('nombre_usuario').value.trim();
-        const password = document.getElementById('password').value;
-        const alertaError = document.getElementById('mensajeError');
-        alertaError.classList.add('d-none');
-
-        try {
-            const respuesta = await fetch('/login-post', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nombre_usuario, password })
-            });
-            const resultado = await respuesta.json();
-            if (respuesta.ok) {
-                localStorage.setItem('usuarioLogueado', resultado.usuario);
-                localStorage.setItem('rolUsuario', resultado.rol);
-                window.location.href = '/';
-            } else {
-                alertaError.innerText = resultado.error || 'Credenciales incorrectas.';
-                alertaError.classList.remove('d-none');
-            }
-        } catch (err) {
-            alertaError.innerText = 'Error de conexión con el servidor.';
-            alertaError.classList.remove('d-none');
-        }
-    });
-</script>
-</body>
-</html>`);
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
 // --- RUTA POST PARA AUTENTICACIÓN ---
@@ -217,7 +153,6 @@ app.put('/actualizar-servicio/:id', upload.array('evidencias'), (req, res) => {
         fecha_realizado, observaciones
     } = req.body;
 
-    // Primero obtenemos el registro actual para conservar evidencias anteriores si no se suben nuevas
     db.query('SELECT evidencia FROM servicios WHERE id = ?', [servicioId], (err, rows) => {
         if (err) return res.status(500).json({ error: 'Error al buscar el servicio.' });
 

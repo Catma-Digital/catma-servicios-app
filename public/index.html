@@ -561,8 +561,8 @@
                     <td class="fw-bold">${u.nombre_usuario}</td>
                     <td><span class="badge bg-secondary">${u.rol}</span></td>
                     <td class="text-center">
-                        <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1" onclick="cargarUsuarioParaEditar(${u.id})" title="Editar"><i class="fa-solid fa-pen"></i></button>
-                        ${u.id !== 1 ? `<button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="eliminarUsuario(${u.id})" title="Eliminar"><i class="fa-solid fa-trash"></i></button>` : ''}
+                        <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="cargarUsuarioParaEditar(${u.id})" title="Editar usuario"><i class="fa-solid fa-pen-to-square"></i></button>
+                        ${u.id !== 1 ? `<button class="btn btn-sm btn-outline-danger py-0 px-2 ms-1" onclick="eliminarUsuario(${u.id})" title="Eliminar usuario"><i class="fa-solid fa-trash"></i></button>` : ''}
                     </td>
                 </tr>
             `;
@@ -576,8 +576,9 @@
         document.getElementById('usuario_id').value = usuario.id;
         document.getElementById('nuevo_nombre_usuario').value = usuario.nombre_usuario;
         document.getElementById('nuevo_password').value = '';
-        document.getElementById('labelPassHelp').innerText = '(Dejar en blanco para conservar)';
-        document.getElementById('nuevo_rol').value = usuario.rol;
+        document.getElementById('labelPassHelp').innerText = '(Opcional: solo si desea cambiarla)';
+        document.getElementById('nuevo_rol').value = usuario.rol || 'colaborador';
+
         document.getElementById('tituloUsuarioForm').innerHTML = `<i class="fa-solid fa-user-pen text-warning me-2"></i> Editando Usuario ID: ${usuario.id}`;
         document.getElementById('btnGuardarUsuario').innerHTML = `<i class="fa-solid fa-user-check me-2"></i> Actualizar Usuario`;
     }
@@ -592,8 +593,9 @@
 
     document.getElementById('crearUsuarioForm').addEventListener('submit', async function(e) {
         e.preventDefault();
+
         const id = document.getElementById('usuario_id').value;
-        const nombre_usuario = document.getElementById('nuevo_nombre_usuario').value.trim();
+        const nombre_usuario = document.getElementById('nuevo_nombre_usuario').value;
         const password = document.getElementById('nuevo_password').value;
         const rol = document.getElementById('nuevo_rol').value;
 
@@ -606,34 +608,38 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ nombre_usuario, password, rol })
             });
+
             const resultado = await respuesta.json();
+
             if (respuesta.ok) {
                 alert(resultado.message);
                 resetearUsuarioForm();
                 cargarUsuarios();
             } else {
-                alert(resultado.error || 'Error en la operación.');
+                alert(resultado.error || 'Error al procesar usuario.');
             }
-        } catch (err) {
-            console.error('Error:', err);
-            alert('Error de conexión.');
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error de conexión al guardar usuario.');
         }
     });
 
     async function eliminarUsuario(id) {
-        if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
+        if (!confirm('¿Está seguro de eliminar este usuario del sistema?')) return;
 
         try {
             const respuesta = await fetch(`/eliminar-usuario/${id}`, { method: 'DELETE' });
             const resultado = await respuesta.json();
+
             if (respuesta.ok) {
                 alert(resultado.message);
                 cargarUsuarios();
             } else {
-                alert(resultado.error || 'No se pudo eliminar.');
+                alert(resultado.error || 'No se pudo eliminar el usuario.');
             }
-        } catch (e) {
-            alert('Error de conexión.');
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error de conexión al eliminar usuario.');
         }
     }
 </script>
