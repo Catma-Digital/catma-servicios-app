@@ -193,7 +193,10 @@ app.put('/actualizar-servicio/:id', upload.array('evidencias'), (req, res) => {
 // --- GESTIÓN DE USUARIOS (CRUD) ---
 app.get('/obtener-usuarios', (req, res) => {
     db.query('SELECT id, nombre_usuario, rol FROM usuarios ORDER BY id DESC', (err, results) => {
-        if (err) return res.status(500).json({ error: 'Error al obtener usuarios.' });
+        if (err) {
+            console.error('Error al obtener usuarios:', err);
+            return res.status(500).json({ error: 'Error al obtener usuarios: ' + err.message });
+        }
         res.json(results);
     });
 });
@@ -208,12 +211,16 @@ app.post('/guardar-usuario', async (req, res) => {
             'INSERT INTO usuarios (nombre_usuario, password_hash, rol) VALUES (?, ?, ?)',
             [nombre_usuario, hashedPassword, rol || 'colaborador'],
             (err) => {
-                if (err) return res.status(500).json({ error: 'El usuario ya existe o error en BD.' });
+                if (err) {
+                    console.error('❌ Error SQL al guardar usuario:', err);
+                    return res.status(500).json({ error: 'Error en BD: ' + err.message });
+                }
                 res.json({ success: true, message: 'Usuario creado exitosamente.' });
             }
         );
     } catch (e) {
-        res.status(500).json({ error: 'Error al procesar contraseña.' });
+        console.error('❌ Error de procesamiento al guardar usuario:', e);
+        res.status(500).json({ error: 'Error al procesar contraseña: ' + e.message });
     }
 });
 
@@ -228,19 +235,25 @@ app.put('/actualizar-usuario/:id', async (req, res) => {
                 'UPDATE usuarios SET nombre_usuario = ?, password_hash = ?, rol = ? WHERE id = ?',
                 [nombre_usuario, hashedPassword, rol, userId],
                 (err) => {
-                    if (err) return res.status(500).json({ error: 'Error al actualizar usuario.' });
+                    if (err) {
+                        console.error('Error al actualizar usuario:', err);
+                        return res.status(500).json({ error: 'Error al actualizar usuario: ' + err.message });
+                    }
                     res.json({ success: true, message: 'Usuario actualizado con contraseña nueva.' });
                 }
             );
         } catch (e) {
-            res.status(500).json({ error: 'Error de servidor.' });
+            res.status(500).json({ error: 'Error de servidor: ' + e.message });
         }
     } else {
         db.query(
             'UPDATE usuarios SET nombre_usuario = ?, rol = ? WHERE id = ?',
             [nombre_usuario, rol, userId],
             (err) => {
-                if (err) return res.status(500).json({ error: 'Error al actualizar usuario.' });
+                if (err) {
+                    console.error('Error al actualizar usuario:', err);
+                    return res.status(500).json({ error: 'Error al actualizar usuario: ' + err.message });
+                }
                 res.json({ success: true, message: 'Usuario actualizado correctamente.' });
             }
         );
@@ -252,7 +265,10 @@ app.delete('/eliminar-usuario/:id', (req, res) => {
     if (userId == 1) return res.status(400).json({ error: 'No se puede eliminar el usuario administrador principal.' });
 
     db.query('DELETE FROM usuarios WHERE id = ?', [userId], (err) => {
-        if (err) return res.status(500).json({ error: 'Error al eliminar usuario.' });
+        if (err) {
+            console.error('Error al eliminar usuario:', err);
+            return res.status(500).json({ error: 'Error al eliminar usuario: ' + err.message });
+        }
         res.json({ success: true, message: 'Usuario eliminado correctamente.' });
     });
 });
