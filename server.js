@@ -25,7 +25,7 @@ const db = mysql.createPool({
     queueLimit: 0
 });
 
-// Verificación y creación automática del admin por defecto
+// Verificación y creación automática del admin por defecto usando 'password'
 db.getConnection(async (err, connection) => {
     if (err) {
         console.error('❌ ERROR BD:', err.message);
@@ -34,7 +34,7 @@ db.getConnection(async (err, connection) => {
     try {
         const hashedPassword = await bcrypt.hash('admin123', 10);
         connection.query(
-            'INSERT IGNORE INTO usuarios (id, nombre_usuario, password_hash, rol) VALUES (1, "admin", ?, "admin")',
+            'INSERT IGNORE INTO usuarios (id, nombre_usuario, password, rol) VALUES (1, "admin", ?, "admin")',
             [hashedPassword],
             (insertErr) => {
                 if (!insertErr) console.log('✔ Usuario admin verificado en la BD.');
@@ -74,7 +74,7 @@ app.post('/login-post', (req, res) => {
         if (!results || results.length === 0) return res.status(401).json({ error: 'Usuario no encontrado en la BD.' });
 
         const usuario = results[0];
-        const storedHash = usuario.password_hash || usuario.password || '';
+        const storedHash = usuario.password || '';
         let match = (password === storedHash);
         if (!match) {
             try { match = await bcrypt.compare(password, storedHash); } catch (e) { match = false; }
@@ -208,7 +208,7 @@ app.post('/guardar-usuario', async (req, res) => {
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         db.query(
-            'INSERT INTO usuarios (nombre_usuario, password_hash, rol) VALUES (?, ?, ?)',
+            'INSERT INTO usuarios (nombre_usuario, password, rol) VALUES (?, ?, ?)',
             [nombre_usuario, hashedPassword, rol || 'colaborador'],
             (err) => {
                 if (err) {
@@ -232,7 +232,7 @@ app.put('/actualizar-usuario/:id', async (req, res) => {
         try {
             const hashedPassword = await bcrypt.hash(password, 10);
             db.query(
-                'UPDATE usuarios SET nombre_usuario = ?, password_hash = ?, rol = ? WHERE id = ?',
+                'UPDATE usuarios SET nombre_usuario = ?, password = ?, rol = ? WHERE id = ?',
                 [nombre_usuario, hashedPassword, rol, userId],
                 (err) => {
                     if (err) {
