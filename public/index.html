@@ -302,9 +302,9 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // 1. Validar si el usuario está logueado al cargar el dashboard
+    // 1. Validar si el usuario está logueado al cargar el dashboard (Ruta corregida a /login.html)
     if (!localStorage.getItem('usuarioLogueado')) {
-        window.location.href = '/portal_Catma/login.html';
+        window.location.href = '/login.html';
     }
 
     // 2. Mostrar datos del usuario activo, validar rol de administrador y cargar datos automáticamente
@@ -324,11 +324,11 @@
         cargarServicios();
     });
 
-    // 3. Función para cerrar sesión
+    // 3. Función para cerrar sesión (Ruta corregida a /login.html)
     function cerrarSesion() {
         localStorage.removeItem('usuarioLogueado');
         localStorage.removeItem('rolUsuario');
-        window.location.href = '/portal_Catma/login.html';
+        window.location.href = '/login.html';
     }
 
     let listaServicios = [];
@@ -512,7 +512,7 @@
         formData.append('fecha_programado', document.getElementById('fecha_programado').value);
         formData.append('fecha_confirmada', document.getElementById('fecha_confirmada').value);
         formData.append('tecnico_asignado', document.getElementById('tecnico_asignado').value);
-        formData.append('estatus', document.getElementById('est` + `status').value);
+        formData.append('estatus', document.getElementById('estatus').value);
         formData.append('fecha_realizado', document.getElementById('fecha_realizado').value);
         formData.append('observaciones', document.getElementById('observaciones').value);
 
