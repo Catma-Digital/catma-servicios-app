@@ -304,7 +304,7 @@
 <script>
     // 1. Validar si el usuario está logueado al cargar el dashboard
     if (!localStorage.getItem('usuarioLogueado')) {
-        window.location.href = '/login.html';
+        window.location.href = '/portal_Catma/login.html';
     }
 
     // 2. Mostrar datos del usuario activo, validar rol de administrador y cargar datos automáticamente
@@ -328,7 +328,7 @@
     function cerrarSesion() {
         localStorage.removeItem('usuarioLogueado');
         localStorage.removeItem('rolUsuario');
-        window.location.href = '/login.html';
+        window.location.href = '/portal_Catma/login.html';
     }
 
     let listaServicios = [];
@@ -512,7 +512,7 @@
         formData.append('fecha_programado', document.getElementById('fecha_programado').value);
         formData.append('fecha_confirmada', document.getElementById('fecha_confirmada').value);
         formData.append('tecnico_asignado', document.getElementById('tecnico_asignado').value);
-        formData.append('estatus', document.getElementById('estatus').value);
+        formData.append('estatus', document.getElementById('est` + `status').value);
         formData.append('fecha_realizado', document.getElementById('fecha_realizado').value);
         formData.append('observaciones', document.getElementById('observaciones').value);
 
@@ -566,56 +566,17 @@
         }
 
         usuarios.forEach(u => {
-            tbody.innerHTML = tbody.innerHTML + `
+            tbody.innerHTML += `
                 <tr>
                     <td>${u.id}</td>
-                    <td class="fw-bold">${u.nombre_usuario}</td>
-                    <td><span class="badge ${u.rol === 'admin' ? 'bg-danger' : 'bg-secondary'}">${u.rol}</span></td>
+                    <td><span class="fw-bold">${u.username}</span></td>
+                    <td><span class="badge bg-secondary">${u.rol}</span></td>
                     <td class="text-center">
-                        <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="cargarUsuarioParaEditar(${u.id})" title="Editar usuario"><i class="fa-solid fa-user-pen"></i></button>
-                        <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="eliminarUsuario(${u.id})" title="Eliminar usuario"><i class="fa-solid fa-user-xmark"></i></button>
+                        <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="eliminarUsuario(${u.id})" title="Eliminar usuario"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 </tr>
             `;
         });
-    }
-
-    document.getElementById('crearUsuarioForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const id = document.getElementById('usuario_id').value;
-        const nombre_usuario = document.getElementById('nuevo_nombre_usuario').value;
-        const password = document.getElementById('nuevo_password').value;
-        const rol = document.getElementById('nuevo_rol').value;
-
-        const url = id ? `/actualizar-usuario/${id}` : '/crear-usuario';
-        const metodo = id ? 'PUT' : 'POST';
-
-        try {
-            const respuesta = await fetch(url, {
-                method: metodo,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nombre_usuario, password, rol })
-            });
-            const mensaje = await respuesta.text();
-            alert(mensaje);
-            resetearUsuarioForm();
-            cargarUsuarios();
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Error al guardar el usuario.');
-        }
-    });
-
-    function cargarUsuarioParaEditar(id) {
-        const usuario = listaUsuarios.find(u => u.id === id);
-        if (!usuario) return;
-
-        document.getElementById('usuario_id').value = usuario.id;
-        document.getElementById('nuevo_nombre_usuario').value = usuario.nombre_usuario;
-        document.getElementById('nuevo_password').value = '';
-        document.getElementById('nuevo_rol').value = usuario.rol;
-        document.getElementById('tituloUsuarioForm').innerHTML = `<i class="fa-solid fa-user-pen text-warning me-2"></i> Editando: ${usuario.nombre_usuario}`;
-        document.getElementById('btnGuardarUsuario').innerHTML = `<i class="fa-solid fa-user-check me-2"></i> Actualizar Usuario`;
     }
 
     function resetearUsuarioForm() {
@@ -625,16 +586,45 @@
         document.getElementById('btnGuardarUsuario').innerHTML = `<i class="fa-solid fa-user-check me-2"></i> Registrar Usuario`;
     }
 
+    document.getElementById('crearUsuarioForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const username = document.getElementById('nuevo_nombre_usuario').value;
+        const password = document.getElementById('nuevo_password').value;
+        const rol = document.getElementById('nuevo_rol').value;
+
+        try {
+            const respuesta = await fetch('/api/usuarios/crear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, rol })
+            });
+            if (respuesta.ok) {
+                alert('Usuario registrado exitosamente.');
+                resetearUsuarioForm();
+                cargarUsuarios();
+            } else {
+                alert('Error al registrar usuario.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    });
+
     async function eliminarUsuario(id) {
         if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
         try {
-            const respuesta = await fetch(`/eliminar-usuario/${id}`, { method: 'DELETE' });
-            const mensaje = await respuesta.text();
-            alert(mensaje);
-            cargarUsuarios();
+            const respuesta = await fetch('/api/usuarios/borrar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            if (respuesta.ok) {
+                cargarUsuarios();
+            } else {
+                alert('No se pudo eliminar el usuario.');
+            }
         } catch (error) {
             console.error('Error:', error);
-            alert('Error al eliminar el usuario.');
         }
     }
 </script>
