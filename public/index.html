@@ -28,9 +28,8 @@
 <!-- Barra de Navegación Profesional -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid px-4">
-        <!-- Logo con fondo blanco y contenedor para resaltar en la barra oscura -->
         <div class="d-flex align-items-center bg-white px-2 py-1 rounded shadow-sm">
-            <img src="images/Logo web.png" alt="CATMA Safe Logo" style="width: 200px; height: auto; margin-right: 8px;">
+            <img src="images/Logo web.png" alt="CATMA Safe Logo" style="width: 200px; height: auto; margin-right: 8px;" onerror="this.style.display='none'">
         </div>
         <div class="d-flex align-items-center gap-3">
             <span class="text-light small" id="infoUsuarioConectado">
@@ -54,7 +53,7 @@
         <li class="nav-item" role="presentation">
             <button class="nav-link fw-bold" id="pills-registro-tab" data-bs-toggle="pill" data-bs-target="#pills-registro" type="button" role="tab" onclick="resetearFormulario()"><i class="fa-solid fa-plus-circle me-2"></i> Nuevo Registro</button>
         </li>
-        <!-- Pestaña de Gestión de Usuarios (Oculta por defecto, solo para Admin) -->
+        <!-- Pestaña de Gestión de Usuarios (Solo visible para Admin) -->
         <li class="nav-item d-none" role="presentation" id="li-gestion-usuarios">
             <button class="nav-link fw-bold" id="pills-usuarios-tab" data-bs-toggle="pill" data-bs-target="#pills-usuarios" type="button" role="tab" onclick="cargarUsuarios()"><i class="fa-solid fa-users-gear me-2"></i> Gestión de Usuarios</button>
         </li>
@@ -302,39 +301,35 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // 1. Validar si el usuario está logueado al cargar el dashboard (Ruta corregida a /login.html)
+    // 1. Validar autenticación
     if (!localStorage.getItem('usuarioLogueado')) {
-        window.location.href = '/login.html';
+        window.location.href = '/login';
     }
 
-    // 2. Mostrar datos del usuario activo, validar rol de administrador y cargar datos automáticamente
     window.addEventListener('DOMContentLoaded', () => {
         const usuarioActivo = localStorage.getItem('usuarioLogueado');
         const rolActivo = localStorage.getItem('rolUsuario');
 
         if (usuarioActivo) {
-            document.getElementById('infoUsuarioConectado').innerHTML = `<i class="fa-solid fa-user-circle me-1"></i> ${usuarioActivo} (${rolActivo || 'Operativo'})`;
+            document.getElementById('infoUsuarioConectado').innerHTML = `<i class="fa-solid fa-user-circle me-1"></i> ${usuarioActivo} (${rolActivo || 'colaborador'})`;
         }
 
         if (rolActivo === 'admin') {
             document.getElementById('li-gestion-usuarios').classList.remove('d-none');
         }
 
-        // Cargar los servicios automáticamente al iniciar la página
         cargarServicios();
     });
 
-    // 3. Función para cerrar sesión (Ruta corregida a /login.html)
     function cerrarSesion() {
         localStorage.removeItem('usuarioLogueado');
         localStorage.removeItem('rolUsuario');
-        window.location.href = '/login.html';
+        window.location.href = '/login';
     }
 
     let listaServicios = [];
     let listaUsuarios = [];
 
-    // Cargar registros de servicios
     async function cargarServicios() {
         try {
             const respuesta = await fetch('/obtener-servicios');
@@ -391,11 +386,11 @@
                     <td>${s.telefono || 'N/A'}</td>
                     <td><span class="badge bg-light text-dark border">${s.tipo_servicio}</span></td>
                     <td>${s.asesor}</td>
-                    <td>${s.fecha_programado ? s.fecha_programado.split('T')[0] : 'N/A'}</td>
+                    <td>${s.fecha_servicio_programado ? s.fecha_servicio_programado.split('T')[0] : 'N/A'}</td>
                     <td>${s.fecha_confirmada ? s.fecha_confirmada.split('T')[0] : 'N/A'}</td>
                     <td>${s.tecnico_asignado || 'Sin asignar'}</td>
                     <td><span class="badge ${badgeClass} px-2 py-1">${s.estatus}</span></td>
-                    <td>${s.fecha_realizado ? s.fecha_realizado.split('T')[0] : 'N/A'}</td>
+                    <td>${s.fecha_servicio_realizado ? s.fecha_servicio_realizado.split('T')[0] : 'N/A'}</td>
                     <td>${s.observaciones || 'N/A'}</td>
                     <td>${linksEvidencias}</td>
                     <td>
@@ -406,7 +401,6 @@
         });
     }
 
-    // Filtrar servicios combinando búsqueda de texto y rango de fechas de registro
     function filtrarServicios() {
         const texto = document.getElementById('inputBusqueda').value.toLowerCase();
         const inicio = document.getElementById('filtroFechaInicio').value;
@@ -437,13 +431,11 @@
         renderizarTabla(filtrados);
     }
 
-    // Exportar tabla visible a Excel
     function exportarExcel() {
         const wb = XLSX.utils.table_to_book(document.querySelector('.table'), { sheet: "ReporteServicios" });
         XLSX.writeFile(wb, 'Reporte_Servicios_CATMA.xlsx');
     }
 
-    // Cargar datos en el formulario para editar servicio
     function cargarParaEditar(id) {
         const servicio = listaServicios.find(s => s.id === id);
         if (!servicio) return;
@@ -463,9 +455,9 @@
         document.getElementById('tecnico_asignado').value = servicio.tecnico_asignado || '';
         document.getElementById('estatus').value = servicio.estatus || 'Pendiente';
 
-        document.getElementById('fecha_programado').value = servicio.fecha_programado ? servicio.fecha_programado.split('T')[0] : '';
+        document.getElementById('fecha_programado').value = servicio.fecha_servicio_programado ? servicio.fecha_servicio_programado.split('T')[0] : '';
         document.getElementById('fecha_confirmada').value = servicio.fecha_confirmada ? servicio.fecha_confirmada.split('T')[0] : '';
-        document.getElementById('fecha_realizado').value = servicio.fecha_realizado ? servicio.fecha_realizado.split('T')[0] : '';
+        document.getElementById('fecha_realizado').value = servicio.fecha_servicio_realizado ? servicio.fecha_servicio_realizado.split('T')[0] : '';
         document.getElementById('observaciones').value = servicio.observaciones || '';
 
         document.getElementById('evidencias').value = '';
@@ -491,7 +483,6 @@
         document.getElementById('btnGuardar').innerHTML = `<i class="fa-solid fa-floppy-disk me-2"></i> Guardar Registro`;
     }
 
-    // Guardar / Actualizar Servicio con soporte para múltiples archivos
     document.getElementById('servicioCompletoForm').addEventListener('submit', async function(e) {
         e.preventDefault();
 
@@ -525,27 +516,25 @@
         const metodo = id ? 'PUT' : 'POST';
 
         try {
-            const respuesta = await fetch(url, {
-                method: metodo,
-                body: formData
-            });
+            const respuesta = await fetch(url, { method: metodo, body: formData });
+            const resultado = await respuesta.json();
 
-            const mensaje = await respuesta.text();
-            alert(mensaje);
-            resetearFormulario();
-
-            const dashboardTab = new bootstrap.Tab(document.getElementById('pills-dashboard-tab'));
-            dashboardTab.show();
-
-            cargarServicios();
+            if (respuesta.ok) {
+                alert(resultado.message);
+                resetearFormulario();
+                const dashboardTab = new bootstrap.Tab(document.getElementById('pills-dashboard-tab'));
+                dashboardTab.show();
+                cargarServicios();
+            } else {
+                alert(resultado.error || 'Error al procesar la solicitud.');
+            }
         } catch (error) {
             console.error('Error:', error);
-            alert('Hubo un error al procesar el registro.');
+            alert('Hubo un error de conexión al procesar el registro.');
         }
     });
 
     // --- GESTIÓN DE USUARIOS ---
-
     async function cargarUsuarios() {
         try {
             const respuesta = await fetch('/obtener-usuarios');
@@ -569,62 +558,82 @@
             tbody.innerHTML += `
                 <tr>
                     <td>${u.id}</td>
-                    <td><span class="fw-bold">${u.username}</span></td>
+                    <td class="fw-bold">${u.nombre_usuario}</td>
                     <td><span class="badge bg-secondary">${u.rol}</span></td>
                     <td class="text-center">
-                        <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="eliminarUsuario(${u.id})" title="Eliminar usuario"><i class="fa-solid fa-trash"></i></button>
+                        <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1" onclick="cargarUsuarioParaEditar(${u.id})" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                        ${u.id !== 1 ? `<button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="eliminarUsuario(${u.id})" title="Eliminar"><i class="fa-solid fa-trash"></i></button>` : ''}
                     </td>
                 </tr>
             `;
         });
     }
 
+    function cargarUsuarioParaEditar(id) {
+        const usuario = listaUsuarios.find(u => u.id === id);
+        if (!usuario) return;
+
+        document.getElementById('usuario_id').value = usuario.id;
+        document.getElementById('nuevo_nombre_usuario').value = usuario.nombre_usuario;
+        document.getElementById('nuevo_password').value = '';
+        document.getElementById('labelPassHelp').innerText = '(Dejar en blanco para conservar)';
+        document.getElementById('nuevo_rol').value = usuario.rol;
+        document.getElementById('tituloUsuarioForm').innerHTML = `<i class="fa-solid fa-user-pen text-warning me-2"></i> Editando Usuario ID: ${usuario.id}`;
+        document.getElementById('btnGuardarUsuario').innerHTML = `<i class="fa-solid fa-user-check me-2"></i> Actualizar Usuario`;
+    }
+
     function resetearUsuarioForm() {
         document.getElementById('crearUsuarioForm').reset();
         document.getElementById('usuario_id').value = '';
+        document.getElementById('labelPassHelp').innerText = '(Nueva o dejar en blanco)';
         document.getElementById('tituloUsuarioForm').innerHTML = `<i class="fa-solid fa-user-plus text-primary me-2"></i> Nuevo Usuario`;
         document.getElementById('btnGuardarUsuario').innerHTML = `<i class="fa-solid fa-user-check me-2"></i> Registrar Usuario`;
     }
 
     document.getElementById('crearUsuarioForm').addEventListener('submit', async function(e) {
         e.preventDefault();
-        const username = document.getElementById('nuevo_nombre_usuario').value;
+        const id = document.getElementById('usuario_id').value;
+        const nombre_usuario = document.getElementById('nuevo_nombre_usuario').value.trim();
         const password = document.getElementById('nuevo_password').value;
         const rol = document.getElementById('nuevo_rol').value;
 
+        const url = id ? `/actualizar-usuario/${id}` : '/guardar-usuario';
+        const metodo = id ? 'PUT' : 'POST';
+
         try {
-            const respuesta = await fetch('/api/usuarios/crear', {
-                method: 'POST',
+            const respuesta = await fetch(url, {
+                method: metodo,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, rol })
+                body: JSON.stringify({ nombre_usuario, password, rol })
             });
+            const resultado = await respuesta.json();
             if (respuesta.ok) {
-                alert('Usuario registrado exitosamente.');
+                alert(resultado.message);
                 resetearUsuarioForm();
                 cargarUsuarios();
             } else {
-                alert('Error al registrar usuario.');
+                alert(resultado.error || 'Error en la operación.');
             }
-        } catch (error) {
-            console.error('Error:', error);
+        } catch (err) {
+            console.error('Error:', err);
+            alert('Error de conexión.');
         }
     });
 
     async function eliminarUsuario(id) {
         if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
+
         try {
-            const respuesta = await fetch('/api/usuarios/borrar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id })
-            });
+            const respuesta = await fetch(`/eliminar-usuario/${id}`, { method: 'DELETE' });
+            const resultado = await respuesta.json();
             if (respuesta.ok) {
+                alert(resultado.message);
                 cargarUsuarios();
             } else {
-                alert('No se pudo eliminar el usuario.');
+                alert(resultado.error || 'No se pudo eliminar.');
             }
-        } catch (error) {
-            console.error('Error:', error);
+        } catch (e) {
+            alert('Error de conexión.');
         }
     }
 </script>

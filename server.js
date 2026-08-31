@@ -25,21 +25,26 @@ const db = mysql.createPool({
     queueLimit: 0
 });
 
-// Verificación y creación automática del admin
+// Verificación y creación automática del admin por defecto
 db.getConnection(async (err, connection) => {
     if (err) {
         console.error('❌ ERROR BD:', err.message);
         return;
     }
-    const hashedPassword = await bcrypt.hash('admin123', 10);
-    connection.query(
-        'INSERT IGNORE INTO usuarios (id, nombre_usuario, password_hash, rol) VALUES (1, "admin", ?, "administrador")',
-        [hashedPassword],
-        (insertErr) => {
-            if (!insertErr) console.log('✔ Usuario admin verificado en la BD.');
-            connection.release();
-        }
-    );
+    try {
+        const hashedPassword = await bcrypt.hash('admin123', 10);
+        connection.query(
+            'INSERT IGNORE INTO usuarios (id, nombre_usuario, password_hash, rol) VALUES (1, "admin", ?, "admin")',
+            [hashedPassword],
+            (insertErr) => {
+                if (!insertErr) console.log('✔ Usuario admin verificado en la BD.');
+                connection.release();
+            }
+        );
+    } catch (hashErr) {
+        console.error('❌ Error al generar hash:', hashErr);
+        connection.release();
+    }
 });
 
 const storage = multer.diskStorage({
@@ -54,7 +59,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- RUTA PRINCIPAL / LOGIN FORZADA DESDE EL BACKEND ---
+// --- RUTA LOGIN (HTML INCRUSTADO) ---
 app.get('/login', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="es">
@@ -123,7 +128,7 @@ app.get('/login', (req, res) => {
 </html>`);
 });
 
-// --- RUTA POST SEPARADA PARA LOGIN ---
+// --- RUTA POST PARA AUTENTICACIÓN ---
 app.post('/login-post', (req, res) => {
     const { nombre_usuario, password } = req.body;
     const query = 'SELECT * FROM usuarios WHERE LOWER(TRIM(nombre_usuario)) = LOWER(TRIM(?))';
@@ -141,10 +146,11 @@ app.post('/login-post', (req, res) => {
 
         if (!match) return res.status(401).json({ error: 'Contraseña incorrecta.' });
 
-        res.json({ usuario: usuario.nombre_usuario, rol: usuario.rol || 'administrador' });
+        res.json({ usuario: usuario.nombre_usuario, rol: usuario.rol || 'colaborador' });
     });
 });
 
+// --- RUTA PRINCIPAL (DASHBOARD) ---
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -160,13 +166,13 @@ app.get('/obtener-servicios', (req, res) => {
     });
 });
 
-// --- GUARDAR SERVICIO COMPLETO (CON DEPURACIÓN DE ERROR SQL) ---
+// --- GUARDAR SERVICIO COMPLETO ---
 app.post('/guardar-servicio-completo', upload.array('evidencias'), (req, res) => {
     const {
         id_cliente, nombre, pedido, remision, modelo, serie, poliza,
         telefono, ubicacion, tipo_servicio, asesor, tecnico_asignado,
-        estatus, fecha_servicio_programado, fecha_confirmada,
-        fecha_servicio_realizado, observaciones
+        estatus, fecha_programado, fecha_confirmada,
+        fecha_realizado, observaciones
     } = req.body;
 
     let nombresArchivos = '';
@@ -188,8 +194,8 @@ app.post('/guardar-servicio-completo', upload.array('evidencias'), (req, res) =>
         modelo || '', serie || '', poliza || '', telefono || '',
         ubicacion || '', tipo_servicio || '', asesor || '',
         tecnico_asignado || '', estatus || 'Proceso',
-        fecha_servicio_programado || null, fecha_confirmada || null,
-        fecha_servicio_realizado || null, nombresArchivos, observaciones || ''
+        fecha_programado || null, fecha_confirmada || null,
+        fecha_realizado || null, nombresArchivos, observaciones || ''
     ];
 
     db.query(query, values, (err, resultado) => {
@@ -198,6 +204,121 @@ app.post('/guardar-servicio-completo', upload.array('evidencias'), (req, res) =>
             return res.status(500).json({ error: 'SQL Error: ' + err.message });
         }
         res.json({ success: true, message: 'Registro guardado correctamente', id: resultado.insertId });
+    });
+});
+
+// --- ACTUALIZAR SERVICIO ---
+app.put('/actualizar-servicio/:id', upload.array('evidencias'), (req, res) => {
+    const servicioId = req.params.id;
+    const {
+        id_cliente, nombre, pedido, remision, modelo, serie, poliza,
+        telefono, ubicacion, tipo_servicio, asesor, tecnico_asignado,
+        estatus, fecha_programado, fecha_confirmada,
+        fecha_realizado, observaciones
+    } = req.body;
+
+    // Primero obtenemos el registro actual para conservar evidencias anteriores si no se suben nuevas
+    db.query('SELECT evidencia FROM servicios WHERE id = ?', [servicioId], (err, rows) => {
+        if (err) return res.status(500).json({ error: 'Error al buscar el servicio.' });
+
+        let archivosFinales = rows.length > 0 ? (rows[0].evidencia || '') : '';
+        if (req.files && req.files.length > 0) {
+            const nuevosNombres = req.files.map(f => f.filename).join(',');
+            archivosFinales = archivosFinales ? archivosFinales + ',' + nuevosNombres : nuevosNombres;
+        }
+
+        const query = `
+            UPDATE servicios SET 
+                id_cliente = ?, nombre = ?, pedido = ?, remision = ?, modelo = ?, 
+                serie = ?, poliza = ?, telefono = ?, ubicacion = ?, tipo_servicio = ?, 
+                asesor = ?, tecnico_asignado = ?, estatus = ?, fecha_servicio_programado = ?, 
+                fecha_confirmada = ?, fecha_servicio_realizado = ?, evidencia = ?, observaciones = ?
+            WHERE id = ?
+        `;
+
+        const values = [
+            id_cliente || '', nombre || '', pedido || '', remision || '',
+            modelo || '', serie || '', poliza || '', telefono || '',
+            ubicacion || '', tipo_servicio || '', asesor || '',
+            tecnico_asignado || '', estatus || 'Proceso',
+            fecha_programado || null, fecha_confirmada || null,
+            fecha_realizado || null, archivosFinales, observaciones || '', servicioId
+        ];
+
+        db.query(query, values, (updateErr) => {
+            if (updateErr) {
+                console.error('Error al actualizar servicio:', updateErr);
+                return res.status(500).json({ error: 'SQL Error: ' + updateErr.message });
+            }
+            res.json({ success: true, message: 'Registro actualizado correctamente' });
+        });
+    });
+});
+
+// --- GESTIÓN DE USUARIOS (CRUD) ---
+app.get('/obtener-usuarios', (req, res) => {
+    db.query('SELECT id, nombre_usuario, rol FROM usuarios ORDER BY id DESC', (err, results) => {
+        if (err) return res.status(500).json({ error: 'Error al obtener usuarios.' });
+        res.json(results);
+    });
+});
+
+app.post('/guardar-usuario', async (req, res) => {
+    const { nombre_usuario, password, rol } = req.body;
+    if (!nombre_usuario || !password) return res.status(400).json({ error: 'Usuario y contraseña obligatorios.' });
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        db.query(
+            'INSERT INTO usuarios (nombre_usuario, password_hash, rol) VALUES (?, ?, ?)',
+            [nombre_usuario, hashedPassword, rol || 'colaborador'],
+            (err) => {
+                if (err) return res.status(500).json({ error: 'El usuario ya existe o error en BD.' });
+                res.json({ success: true, message: 'Usuario creado exitosamente.' });
+            }
+        );
+    } catch (e) {
+        res.status(500).json({ error: 'Error al procesar contraseña.' });
+    }
+});
+
+app.put('/actualizar-usuario/:id', async (req, res) => {
+    const userId = req.params.id;
+    const { nombre_usuario, password, rol } = req.body;
+
+    if (password && password.trim() !== '') {
+        try {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            db.query(
+                'UPDATE usuarios SET nombre_usuario = ?, password_hash = ?, rol = ? WHERE id = ?',
+                [nombre_usuario, hashedPassword, rol, userId],
+                (err) => {
+                    if (err) return res.status(500).json({ error: 'Error al actualizar usuario.' });
+                    res.json({ success: true, message: 'Usuario actualizado con contraseña nueva.' });
+                }
+            );
+        } catch (e) {
+            res.status(500).json({ error: 'Error de servidor.' });
+        }
+    } else {
+        db.query(
+            'UPDATE usuarios SET nombre_usuario = ?, rol = ? WHERE id = ?',
+            [nombre_usuario, rol, userId],
+            (err) => {
+                if (err) return res.status(500).json({ error: 'Error al actualizar usuario.' });
+                res.json({ success: true, message: 'Usuario actualizado correctamente.' });
+            }
+        );
+    }
+});
+
+app.delete('/eliminar-usuario/:id', (req, res) => {
+    const userId = req.params.id;
+    if (userId == 1) return res.status(400).json({ error: 'No se puede eliminar el usuario administrador principal.' });
+
+    db.query('DELETE FROM usuarios WHERE id = ?', [userId], (err) => {
+        if (err) return res.status(500).json({ error: 'Error al eliminar usuario.' });
+        res.json({ success: true, message: 'Usuario eliminado correctamente.' });
     });
 });
 
